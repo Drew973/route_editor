@@ -1,0 +1,87 @@
+    want run_chainage,section,start_sec_ch,end_sec_ch for possible changes of section.
+  
+  
+	find possible edges/sections:
+    
+		make all geometries for readings layer into linestring 1st.
+			simplifies as can be used with points or smaller linestrings.
+	
+		get all intersections of buffer and this. (linestrings)
+	
+		can get run chainage from nearest features to intersection.(inconsistant lengths as 3d->2d)
+	
+	
+	
+	
+	
+	may want to autofit after adding some rows...
+		easy to filter to edges between a and b
+		or only add where doesn't conflict with existing.	
+	
+	
+	only add options where doesn't confict with existing and no better option exists
+	
+	
+	want way to filter options.
+		cost function should be high for these.
+		
+		
+		
+	ST_FrechetDistance distance between section and run geom is good way to find incorrect slip roads.
+		
+		
+	
+  
+	includes:
+        nodes
+        where readings go off network
+        where readings leave area near section
+        start reading
+		end reading
+		where gap in readings.
+		
+		
+		reading geom not near last geom gets start + gaps.
+
+
+		
+        these are where readings geom intersects side of buffer
+        get points where readings intersect flat ended buffer around sections.
+        will include all 3.
+        will have multiple around nodes where multiple sections meet.
+        shouldn't be problem
+        Shortest path could remove
+		
+		
+		
+
+
+		select *,s_ch+(lead(s_ch) over order by s_ch -s_ch)*Line_Locate_Point(vect,ST_Intersection(vect,buffer)) from readings inner join buffered on intersects(buffer,vect)
+
+
+select *,s_ch+(lead(raw_ch) over (order by raw_ch) -raw_ch)*Line_Locate_Point(input1.geometry,ST_Intersection(input1.geometry,input2.geometry)) from input2 inner join input1 on intersects(input1.geometry,input2.geometry)
+
+		select 
+	
+	
+	#spatialite not smart enough to use index?
+select * from readings inner join buffered on ST_Intersects(buffered.geom,vect.geom)
+AND readings.ROWID IN (
+  SELECT ROWID FROM SpatialIndex 
+  WHERE f_table_name='strlayer' AND search_frame=blayer.geometry)
+);
+		
+		
+		
+buffer network and save to geopackage.
+
+save
+
+join attributes by location
+{ 'DISCARD_NONMATCHING' : False, 'INPUT' : 'C:/Users/drew.bennett/Documents/generalised_fitting/test.gpkg|layername=readings', 'JOIN' : 'C:/Users/drew.bennett/Documents/generalised_fitting/test.gpkg|layername=buffered', 'JOIN_FIELDS' : [], 'OUTPUT' : 'TEMPORARY_OUTPUT', 'PREDICATE' : [0], 'SUMMARIES' : [] }
+
+
+
+for each reading:
+get network features within threshold distance
+
