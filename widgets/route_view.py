@@ -1,87 +1,88 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu May  5 07:49:13 2022
+Created on Fri Sep 30 10:32:15 2022
 
 @author: Drew.Bennett
+model may have run or not. makes no difference to view.
+
+
+
+
 """
 
-from PyQt5.QtWidgets import QTableView
+from PyQt5.QtWidgets import QTableView,QMenu,QAbstractItemView
 
-from route_editor import feature_picker_delegate
+from PyQt5.QtCore import Qt
+# PyQt5.QtGui import QKeySequence
 
+
+from . import chainage_delegate
 
 
 class routeView(QTableView):
     
-    
-    def __init__(self,parent=None):
+    def __init__(self,parent=None,undoStack=None):
         super().__init__(parent)
-        self.setNetworkLayer(None)
-        self.setLabelField(None)
-        self.setReadingsLayer(None)
+        self.undoStack = undoStack
+        
+        self.rowsMenu = QMenu(self)
+        self.rowsMenu.setToolTipsVisible(True)
 
-        
-        
-    def setNetworkLayer(self,layer):
-        self._networkLayer = layer
-        self.updateSecDelegate()
-        
-        
-        
-    def getNetworkLayer(self):
-        return self._networkLayer
-    
-    
-    
-    def updateSecDelegate(self):
-        f = self.getLabelField()
-        if f is None:
-            f = ''
-        
-        d = feature_picker_delegate.featurePickerDelegate(parent=self,displayExpression=f,layer=self.getNetworkLayer())
-        self.setItemDelegateForColumn(0,d)
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(lambda pt:self.rowsMenu.exec_(self.mapToGlobal(pt)))         
 
+        self.selectOnLayersAct = self.rowsMenu.addAction('select on layers')
+        self.selectOnLayersAct.setToolTip('select these rows on network and readings layers.')
+        self.selectOnLayersAct.triggered.connect(self.selectOnLayers)
+
+        #selectFromLayersAct = self.rows_menu.addAction('select from layers')
+        #selectFromLayersAct.setToolTip('set selected rows from selected features of readings layer.')
+  #      self.select_from_layers_act.triggered.connect(self.select_from_layers)
+
+        self.deleteRowsAct = self.rowsMenu.addAction('delete selected rows')
+        self.deleteRowsAct.triggered.connect(self.dropSelectedRows)
+        
+        #create delegates
+   #     self.secDelegate = sec_delegate.secDelegate(self)
+        self.chainageDelegate = chainage_delegate.chainageDelegate(parent=self)
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)
 
 
-    def setReadingsLayer(self,layer):
-        self._readingsLayer = layer
-        self.updateSecDelegate()
+
+    def setModel(self,model):
+        print('setModel')
+        super().setModel(model)
+        self.resizeColumnsToContents()
+
+        self.hideColumn(model.fieldIndex('pk'))
+        self.hideColumn(model.fieldIndex('run'))
+        self.hideColumn(model.fieldIndex('sort_col'))
+
+        if True:
+        #    logger.debug('setModel special')
+        #    print(model.fieldIndex('pk'))
+        #    self.hideColumn(model.fieldIndex('pk'))
+        #    self.setItemDelegateForColumn(model.fieldIndex('sec'),self.secDelegate)
+            self.setItemDelegateForColumn(model.fieldIndex('start_run_ch'),self.chainageDelegate)    
+            self.setItemDelegateForColumn(model.fieldIndex('end_run_ch'),self.chainageDelegate)
+            self.setItemDelegateForColumn(model.fieldIndex('start_sec_ch'),self.chainageDelegate)
+            self.setItemDelegateForColumn(model.fieldIndex('end_sec_ch'),self.chainageDelegate)    
+
+
+
+    #list of row indexes
+    def selectedRows(self):
+        return [i.row() for i in self.selectionModel().selectedRows()]
     
 
-    
-    def getReadingsLayer(self):
-        return self._readings_layer
-    
-    
-    
-    def setLabelField(self,field):
-        if not self.model() is None:
-            self.model().setLabelField(field)
-            self.updateSecDelegate()
-    
-    
-    
-    def getLabelField(self):
-        if not self.model() is None:
-            return self.model().getLabelField()
+    def dropSelectedRows(self):
+        for r in self.selectedRows():
+            self.model().removeRow(r)
+        
+        
+    def selectOnLayers(self):
+        self.model().selectOnLayers(self.selectedRows())
        
-    
-    
-    def setStartChainageField(self,field):
-        self._startChainageField = field
         
         
         
-    def getStartChainageField(self):
-        return self._startChainageField
-        
-    
-    
-    def setEndChainageField(self,field):
-        self._endChainageField = field
-        
-        
-        
-    def getEndChainageField(self):
-        return self._endChainageField
-    

@@ -19,6 +19,10 @@ needs model to map double to point. with:
     
     floatToXY(index,value) method. returns (x,y) in model crs
     floatToXY
+    
+    
+    units for chainage.  
+    
 
 """
 
@@ -28,7 +32,7 @@ from PyQt5.QtCore import QModelIndex
 
 from qgis.gui import QgsMapToolEmitPoint,QgsVertexMarker
 from qgis.utils import iface
-from qgis.core import QgsPointXY, QgsCoordinateTransform,QgsCoordinateReferenceSystem, Qgis, QgsProject
+from qgis.core import QgsCoordinateTransform, QgsProject
 
 
 
@@ -39,7 +43,6 @@ class chainageWidget(QDoubleSpinBox):
         super().__init__(parent)
         self.setIndex(QModelIndex())
 
-        self.setCrs()
         self.tool = QgsMapToolEmitPoint(iface.mapCanvas())
        # self.tool = chainageEmitter()
         
@@ -50,14 +53,12 @@ class chainageWidget(QDoubleSpinBox):
     
         self.valueChanged.connect(self.updateMarker)       
         
-    
         self.setSingleStep(0.001)#1m
         self.setDecimals(3)
         self.updateMarker(self.value())
 
 
 
-    
     '''
     set index (QModelIndex).
     index and it's model is used to convert between points and values
@@ -78,63 +79,30 @@ class chainageWidget(QDoubleSpinBox):
     def getIndex(self):
         return self._index
             
-        
-    
-    def setCrs(self,crs=QgsCoordinateReferenceSystem()):
-        self._crs = crs
-    
-    
-    
-    def getCrs(self):
-        return self._crs
-    
-    
-    
-    #transform from project crs to self.crs
-    def getTransform(self):
-        return QgsCoordinateTransform(QgsProject.instance().crs(),self.getCrs(),QgsProject.instance())
-        
-        
-    
     
     #happens after focusOutEvent
     def setFromPoint(self,point):
-              
         index = self.getIndex()
-        
         m = index.model()
-        
         if m is not None:
-            pt = self.getTransform().transform(point)#transform point from project to self.crs
-            
-            v = m.XYToFloat(pt.x(),pt.y(),index)
-                        
+            v = m.pointToFloat(pt=point,crs=QgsProject.instance().crs(),index=index)
             if isinstance(v,float):
                 self.setValue(v)
-            
         
 
     def updateMarker(self,val):
         i = self.getIndex()
-        
         m = i.model()
-       
         if m is not None:
-            
-            x,y = m.floatToXY(val,i)
-            
-            if not (x is None or y is None):
-                pt = QgsPointXY(x,y)
-                pt = self.getTransform().transform(pt,Qgis.TransformDirection.Reverse)#convert to project crs
-                self.marker.setCenter(pt)#needs to be in project crs
-
+            pt,crs = m.floatToPoint(val,i)
+            transform = QgsCoordinateTransform(crs,QgsProject.instance().crs(),QgsProject.instance())#transform to project crs
+            self.marker.setCenter(transform.transform(pt))#needs to be in project crs
 
 
     def focusInEvent(self,event):
         iface.mapCanvas().setMapTool(self.tool)
         self.marker.show()
         super().focusInEvent(event)
-
     
 
     #happens before setFromPoint and before delegate destroys widget
@@ -149,6 +117,7 @@ class chainageWidget(QDoubleSpinBox):
         
     def __del__(self):
         iface.mapCanvas().scene().removeItem(self.marker)
+
 
     def deleteLater(self):
         iface.mapCanvas().scene().removeItem(self.marker)

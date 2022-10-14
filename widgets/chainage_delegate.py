@@ -15,21 +15,18 @@ setModel data seems to happen before focusLost event and before things connected
 from . import chainage_widget
 from PyQt5.QtWidgets import QStyledItemDelegate
 
-from qgis.core import QgsCoordinateReferenceSystem
 
 
 
 class chainageDelegate(QStyledItemDelegate):
     
     
-    def __init__(self,parent=None,crs=QgsCoordinateReferenceSystem()):
+    def __init__(self,parent=None):
         super().__init__(parent)
-        self.crs = crs
         
     
     def createEditor(self,parent,option,index):
         w = chainage_widget.chainageWidget(parent=parent)
-        w.setCrs(self.crs)
         w.setIndex(index)
         
         if isinstance(index.data(),float) or isinstance(index.data(),int):

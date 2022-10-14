@@ -29,16 +29,19 @@ from PyQt5.QtWidgets import QMenuBar
 
 from qgis.PyQt import QtWidgets, uic
 from qgis.PyQt.QtCore import pyqtSignal
-from qgis.core import QgsFeature
 
-from route_editor import route_model
-from route_editor.widgets import layers_dialog
+from route_editor.models.routes import routes_model
+from route_editor.widgets import fields_dialog
 
+from route_editor.models.get_db import getDb
 
 
 
 FORM_CLASS, _ = uic.loadUiType(os.path.join(
     os.path.dirname(__file__), 'route_editor_dockwidget_base.ui'))
+
+
+
 
 
 class routeEditorDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
@@ -47,37 +50,39 @@ class routeEditorDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
 
     def __init__(self, parent=None):
         super(routeEditorDockWidget, self).__init__(parent)
+       
         self.setupUi(self)
-        
-        self.mainView.setModel(route_model.routeModel())
-        self.initLayersDialog()
+        self.layersDialog = fields_dialog.fieldsDialog(parent=self)
         self.initTopMenu()
-
-
-
-
-
-    def initLayersDialog(self):
-        self.layersDialog = layers_dialog.layersDialog(parent=self)
-        self.layersDialog.networkBox.layerChanged.connect(self.mainView.setNetworkLayer)
-        self.layersDialog.labelBox.fieldChanged.connect(self.mainView.setLabelField)
-        self.layersDialog.readingsBox.layerChanged.connect(self.mainView.setReadingsLayer)
-        self.layersDialog.startChainageBox.fieldChanged.connect(self.mainView.setStartChainageField)
-        self.layersDialog.endChainageBox.fieldChanged.connect(self.mainView.setEndChainageField)
-
-
-        #set to current layers/fields
-        self.mainView.setNetworkLayer(self.layersDialog.networkBox.currentLayer())
-        self.mainView.setLabelField(self.layersDialog.labelBox.currentField())
-        self.mainView.setReadingsLayer(self.layersDialog.readingsBox.currentLayer())
-        self.mainView.setStartChainageField(self.layersDialog.startChainageBox.currentField())
-        self.mainView.setEndChainageField(self.layersDialog.endChainageBox.currentField())       
+        self.setDb()     
+        self.runBox.setModel(self.layersDialog.runsModel)
+        self.runBox.currentIndexChanged.connect(self.runSet)
+        self.runSet()
+        self.filterButton.clicked.connect(self.filterLayer)
         
         
+        
+    def filterLayer(self):
+        if isinstance(self.mainView.model(),routes_model.routesModel):
+            self.mainView.model().filterLayer()
+        
+        
+    def runSet(self):
+        self.mainView.model().setRun(self.runBox.currentText())
+        
+        
+        
+    def setDb(self):
+        db = getDb()
+        m = routes_model.routesModel(db=db,parent=self)
+        m.setFields(self.layersDialog)
+        m.select()
+        self.mainView.setModel(m)
+
+
 
     def initTopMenu(self):
         topMenu = QMenuBar()       
-
 
         #file
         fileMenu = topMenu.addMenu("File")
@@ -94,7 +99,6 @@ class routeEditorDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         insertFeatureAct.setShortcut(QKeySequence('Alt+1'))#focus policy of dockwidget probably important here
         insertFeatureAct.setToolTip('Insert selected feature of layer')
         insertFeatureAct.triggered.connect(self.insertFeature)
-
 
 
         insertDummyAct = insertMenu.addAction('Insert Dummy')
@@ -114,12 +118,17 @@ class routeEditorDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         setLayersAct.triggered.connect(self.layersDialog.show)
 
 
+        fitMenu = topMenu.addMenu("Fitting")
+        refitAct = fitMenu.addAction('Fit readings')
+        refitAct.setToolTip('Create new layer with fitted readings')
+        refitAct.triggered.connect(self.refit)
+        fitMenu.setToolTipsVisible(True)
+
         #help
         helpMenu = topMenu.addMenu('Help')  
         openHelpAct = helpMenu.addAction('Open help (in your default web browser)')
         openHelpAct.triggered.connect(self.openHelp)
 
-        
         self.mainWidget.layout().setMenuBar(topMenu)
         
         
@@ -129,48 +138,36 @@ class routeEditorDockWidget(QtWidgets.QDockWidget, FORM_CLASS):
         event.accept()
 
 
-    
-    def getLayer(self):
-        return self.layersDialog.networkBox.currentLayer()
-        
-        
-    
+
     def getInsertRow(self):
         return self.rowBox.value()
-
 
 
     def load(self):
         pass
     
     
+    def refit(self):
+        if isinstance(self.mainView.model(),routes_model.routesModel):
+            self.mainView.model().refit()
+        
     
     def save(self):
         pass
     
     
-    
     def insertDummy(self):
-        self.mainView.model().insertDummy(row=self.getInsertRow())
+        if isinstance(self.mainView.model(),routes_model.routesModel):
+            self.mainView.model().insertDummy(row=self.getInsertRow())
 
-    
-    
-    def insertFeature(self):
-        layer = self.getLayer()
-        feats = layer.selectedFeatures()
-        
-        if feats:
-            f = feats[0]
-        else:
-            f = QgsFeature()
-
-        self.mainView.model().insert(row=self.getInsertRow(),networkFeature=f)
-        
-        
     
     def insertFile(self):
         pass
     
+    
+    def insertFeature(self):
+        if isinstance(self.mainView.model(),routes_model.routesModel):
+            self.mainView.model().insertSelected()
     
     
     def openHelp(self):
